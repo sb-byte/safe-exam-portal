@@ -1,0 +1,51 @@
+{
+  "status": "success",
+  "experiment": "Syllabus Exp 4, 5, 6 - SMOTE & Ensemble Cheating Detection",
+  "original_distribution": {
+    "Honest (Class 0)": 2125,
+    "Suspicious (Class 1)": 250,
+    "Likely Cheating (Class 2)": 125
+  },
+  "smote_balanced_distribution": {
+    "Honest (Class 0)": 1594,
+    "Suspicious (Class 1)": 1594,
+    "Likely Cheating (Class 2)": 1594
+  },
+  "metrics": {
+    "baseline_accuracy": 98.72,
+    "baseline_cheating_f1": 96.67,
+    "smote_ensemble_accuracy": 98.72,
+    "smote_ensemble_cheating_f1": 96.77,
+    "cheater_recall_gain": "+0.1% improvement with SMOTE"
+  },
+  "feature_importances": [
+    {
+      "feature": "Fullscreen Exits",
+      "importance": 0.2138
+    },
+    {
+      "feature": "Copy/Paste Attempts",
+      "importance": 0.1866
+    },
+    {
+      "feature": "Multiple Faces",
+      "importance": 0.1827
+    },
+    {
+      "feature": "Warning Count",
+      "importance": 0.1445
+    },
+    {
+      "feature": "Tab Switches",
+      "importance": 0.1159
+    },
+    {
+      "feature": "Face Missing Events",
+      "importance": 0.1069
+    },
+    {
+      "feature": "Look Away Duration (s)",
+      "importance": 0.0495
+    }
+  ]
+}

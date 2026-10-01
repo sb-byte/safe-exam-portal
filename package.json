@@ -1,0 +1,22 @@
+{
+  "name": "secure-exam-platform",
+  "version": "1.0.0",
+  "description": "SecureExam - AI-Powered Online Examination and Candidate Proctoring Portal",
+  "scripts": {
+    "start": "node server/src/index.js",
+    "server": "node server/src/index.js",
+    "client": "npm run dev --prefix client -- --port 3000 --host",
+    "build": "npm run build --prefix client",
+    "ml:train": "./venv/bin/python server/ml/train_cheating_model.py",
+    "ml:adversarial": "./venv/bin/python server/ml/adversarial_fgsm.py"
+  },
+  "keywords": [
+    "ai-proctoring",
+    "face-biometrics",
+    "liveness-detection",
+    "cybersecurity",
+    "online-exam"
+  ],
+  "author": "Sai Bhadane",
+  "license": "ISC"
+}
