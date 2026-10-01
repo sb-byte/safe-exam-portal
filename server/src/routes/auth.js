@@ -1,13 +1,24 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { db } from '../db.js';
 import { getGeoLocation, parseDeviceInfo } from '../services/geo.js';
 import { sendSecurityAlertEmail } from '../services/mailer.js';
 import { broadcastSecurityAlert, broadcastUserUpdate } from '../services/socket.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'secure-exam-cyber-jwt-key-2026';
+
+// Enterprise Rate Limiter: Protect against credential stuffing & automated brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // limit each IP to 50 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication requests from this IP. Please wait 15 minutes before retrying.' }
+});
 
 // Helper: Calculate Euclidean distance between two face embedding vectors
 function calculateEuclideanDistance(vec1, vec2) {
@@ -20,48 +31,67 @@ function calculateEuclideanDistance(vec1, vec2) {
   return Math.sqrt(sum);
 }
 
-// Register
-router.post('/register', async (req, res) => {
+// Helper: Decode Google JWT Token (JWT format: header.payload.signature)
+function decodeGoogleJwt(credential) {
   try {
-    const { username, email, password, fullName, keystrokeMetrics } = req.body;
+    const parts = credential.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64url').toString('utf-8');
+    return JSON.parse(payload);
+  } catch (e) {
+    return null;
+  }
+}
+
+// 1. Standard Register
+router.post('/register', authLimiter, async (req, res) => {
+  try {
+    const { username, email, password, fullName, role = 'student', keystrokeMetrics } = req.body;
 
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'Username, email and password are required.' });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long for enterprise security.' });
+    }
+
     if (db.findUserByUsername(username)) {
-      return res.status(409).json({ error: 'Username already taken.' });
+      return res.status(409).json({ error: 'Username is already taken. Please choose another.' });
     }
 
     if (db.findUserByEmail(email)) {
-      return res.status(409).json({ error: 'Email already registered.' });
+      return res.status(409).json({ error: 'Email is already registered. Please sign in.' });
     }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    const safeRole = ['admin', 'faculty', 'student'].includes(role) ? role : 'student';
+
     const newUser = db.createUser({
-      username,
-      email,
+      username: username.trim().toLowerCase(),
+      email: email.trim().toLowerCase(),
       passwordHash,
       fullName: fullName || username,
-      role: 'student',
-      keystrokeProfile: keystrokeMetrics || null // Experiment 2: Keystroke dynamics
+      role: safeRole,
+      keystrokeProfile: keystrokeMetrics || null
     });
 
     const token = jwt.sign(
       { id: newUser.id, username: newUser.username, role: newUser.role },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '48h' }
     );
 
     broadcastUserUpdate(newUser);
 
+    const { passwordHash: _, ...safeUser } = newUser;
     return res.status(201).json({
       message: 'Account created successfully! You are now logged in.',
-      user: newUser,
+      user: safeUser,
       token,
-      promptFaceEnrollment: true // Triggers requirement: "After the first login, an optional popup asks: Do you want to add face login?"
+      promptFaceEnrollment: safeRole === 'student'
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -69,24 +99,22 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Standard Login (Email or Username + Password)
-router.post('/login', async (req, res) => {
+// 2. Standard Login (Email or Username + Password)
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { identifier, password, keystrokeMetrics } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-    const userAgent = req.headers['user-agent'] || 'Modern Web Browser';
+    const userAgent = req.headers['user-agent'] || 'Enterprise Web Browser';
 
     if (!identifier || !password) {
       return res.status(400).json({ error: 'Username/Email and Password are required.' });
     }
 
-    // Find by username or email
     const user = db.findUserByUsername(identifier) || db.findUserByEmail(identifier);
     const targetUsername = user ? user.username : identifier;
 
-    // Check password
     let isMatch = false;
-    if (user) {
+    if (user && user.passwordHash) {
       isMatch = await bcrypt.compare(password, user.passwordHash);
     }
 
@@ -94,7 +122,6 @@ router.post('/login', async (req, res) => {
     const device = parseDeviceInfo(userAgent);
 
     if (!isMatch) {
-      // Increment failed password count for this account
       const failedCount = db.incrementFailedAttempts(targetUsername);
 
       const attemptRecord = {
@@ -108,13 +135,9 @@ router.post('/login', async (req, res) => {
         keystrokeMetrics: keystrokeMetrics || null
       };
 
-      const savedAttempt = db.addLoginAttempt(attemptRecord);
+      db.addLoginAttempt(attemptRecord);
 
-      // WRONG PASSWORD PROTECTION REQUIREMENT:
-      // If someone types a wrong password more than 3 times for a username:
-      // 1. The real account owner gets an email: "Someone is trying to log in to your account."
-      // 2. The attempt is saved and shown in the admin dashboard.
-      // 3. Admin can see: IP, approx location, device name, browser, time, attempt count.
+      // Enterprise Brute Force Alert (after > 3 failed attempts)
       let emailDispatched = false;
       if (failedCount > 3 && user) {
         try {
@@ -125,13 +148,12 @@ router.post('/login', async (req, res) => {
           });
           emailDispatched = true;
         } catch (emailErr) {
-          console.error('Email dispatch error:', emailErr);
+          console.error('Security alert email dispatch error:', emailErr);
         }
 
-        // Live alert via Socket.io
         broadcastSecurityAlert({
           type: 'BRUTE_FORCE_THRESHOLD_EXCEEDED',
-          title: '🚨 Suspicious Brute Force Attack Detected!',
+          title: '🚨 Enterprise Intrusion Alert: Multiple Failed Attempts',
           username: targetUsername,
           attemptCount: failedCount,
           location,
@@ -146,7 +168,7 @@ router.post('/login', async (req, res) => {
         thresholdExceeded: failedCount > 3,
         emailDispatched,
         message: failedCount > 3
-          ? `⚠️ Warning: ${failedCount} failed attempts logged! Security alert email dispatched to ${user?.email || 'account owner'} and reported to Admin.`
+          ? `⚠️ Critical Security Alert: ${failedCount} failed attempts recorded! Security alert email dispatched to ${user?.email || 'account owner'} and logged in SOC dashboard.`
           : `Invalid credentials. (${failedCount}/3 attempts before security alert is dispatched).`
       });
     }
@@ -154,7 +176,6 @@ router.post('/login', async (req, res) => {
     // Success - reset failed counter
     db.resetFailedAttempts(targetUsername);
 
-    // Record successful login
     db.addLoginAttempt({
       username: targetUsername,
       success: true,
@@ -168,12 +189,12 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '48h' }
     );
 
     const { passwordHash, ...safeUser } = user;
     return res.json({
-      message: 'Logged in successfully.',
+      message: 'Authentication successful.',
       user: safeUser,
       token
     });
@@ -183,21 +204,113 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Face Enrollment
-router.post('/enroll-face', async (req, res) => {
+// 3. Google OAuth & SSO Authentication
+router.post('/google', authLimiter, async (req, res) => {
   try {
-    const { userId, faceDescriptor } = req.body;
+    const { credential, googleProfile, requestedRole } = req.body;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'Enterprise Web Browser';
 
-    if (!userId || !faceDescriptor || !Array.isArray(faceDescriptor)) {
-      return res.status(400).json({ error: 'Valid userId and 128-d face descriptor vector are required.' });
+    let email = null;
+    let name = null;
+    let picture = null;
+    let googleId = null;
+
+    if (credential) {
+      const decoded = decodeGoogleJwt(credential);
+      if (decoded) {
+        email = decoded.email;
+        name = decoded.name;
+        picture = decoded.picture;
+        googleId = decoded.sub;
+      }
+    } else if (googleProfile) {
+      email = googleProfile.email;
+      name = googleProfile.name || googleProfile.fullName;
+      picture = googleProfile.picture || googleProfile.avatarUrl;
+      googleId = googleProfile.googleId || googleProfile.sub || `goog_${Date.now()}`;
     }
 
-    const user = db.findUserById(userId);
+    if (!email) {
+      return res.status(400).json({ error: 'Valid Google authentication token or profile required.' });
+    }
+
+    const location = await getGeoLocation(ip);
+    const device = parseDeviceInfo(userAgent);
+
+    // Check if user exists by email or googleId
+    let user = db.findUserByEmail(email) || (googleId ? db.findUserByGoogleId(googleId) : null);
+
     if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
+      // Create new enterprise user linked to Google SSO
+      const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() || 'user';
+      let uniqueUsername = baseUsername;
+      let counter = 1;
+      while (db.findUserByUsername(uniqueUsername)) {
+        uniqueUsername = `${baseUsername}${counter++}`;
+      }
+
+      const role = requestedRole && ['admin', 'faculty', 'student'].includes(requestedRole)
+        ? requestedRole
+        : (email.includes('faculty') || email.includes('admin') || email.includes('prof') ? 'faculty' : 'student');
+
+      user = db.createUser({
+        username: uniqueUsername,
+        email: email.toLowerCase(),
+        fullName: name || uniqueUsername,
+        role,
+        googleId,
+        avatarUrl: picture,
+        faceEnrolled: false
+      });
+
+      broadcastUserUpdate(user);
+    } else {
+      // Update Google profile info if not present
+      if (!user.googleId && googleId) {
+        user = db.updateUser(user.id, { googleId, avatarUrl: picture || user.avatarUrl });
+      }
     }
 
-    // Save as numbers, not photos (Privacy requirement #9!)
+    db.addLoginAttempt({
+      username: user.username,
+      success: true,
+      reason: `Google SSO Authentication (${user.email})`,
+      ip: location.ip || ip,
+      location,
+      device,
+      attemptCount: 1
+    });
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '48h' }
+    );
+
+    const { passwordHash, ...safeUser } = user;
+    return res.json({
+      message: 'Authenticated successfully with Google SSO.',
+      user: safeUser,
+      token,
+      isGoogleAuth: true
+    });
+  } catch (err) {
+    console.error('Google OAuth error:', err);
+    return res.status(500).json({ error: 'Google SSO authentication failed.' });
+  }
+});
+
+// 4. Face Enrollment
+router.post('/enroll-face', authenticateToken, async (req, res) => {
+  try {
+    const { faceDescriptor } = req.body;
+    const userId = req.user.id;
+
+    if (!faceDescriptor || !Array.isArray(faceDescriptor)) {
+      return res.status(400).json({ error: '128-d face descriptor vector is required.' });
+    }
+
     const updatedUser = db.updateUser(userId, {
       faceEnrolled: true,
       faceDescriptor: faceDescriptor.slice(0, 128)
@@ -205,9 +318,10 @@ router.post('/enroll-face', async (req, res) => {
 
     broadcastUserUpdate(updatedUser);
 
+    const { passwordHash, ...safeUser } = updatedUser;
     return res.json({
       message: 'Face biometric template successfully enrolled!',
-      user: updatedUser
+      user: safeUser
     });
   } catch (err) {
     console.error('Face enrollment error:', err);
@@ -215,12 +329,12 @@ router.post('/enroll-face', async (req, res) => {
   }
 });
 
-// Face Only Login (with Liveness Check)
-router.post('/face-login', async (req, res) => {
+// 5. Face Only Login (with verified dynamic liveness)
+router.post('/face-login', authLimiter, async (req, res) => {
   try {
     const { username, faceDescriptor, livenessVerified, livenessAction } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-    const userAgent = req.headers['user-agent'] || 'Modern Web Browser';
+    const userAgent = req.headers['user-agent'] || 'Enterprise Web Browser';
 
     if (!username || !faceDescriptor || !Array.isArray(faceDescriptor)) {
       return res.status(400).json({ error: 'Username and face descriptor are required.' });
@@ -233,16 +347,13 @@ router.post('/face-login', async (req, res) => {
 
     if (!user.faceEnrolled || !user.faceDescriptor) {
       return res.status(400).json({
-        error: 'Face login is not enabled for this account yet. Please log in with password first to enroll.'
+        error: 'Face login is not enabled for this account. Please sign in with password first to enroll your face.'
       });
     }
 
     const location = await getGeoLocation(ip);
     const device = parseDeviceInfo(userAgent);
 
-    // LIVENESS CHECK REQUIREMENT:
-    // "The system asks for a random action, like blink or turn head left.
-    // A photo or video on phone cannot do this, so it is rejected."
     if (!livenessVerified) {
       db.addLoginAttempt({
         username: user.username,
@@ -255,14 +366,12 @@ router.post('/face-login', async (req, res) => {
       });
 
       return res.status(403).json({
-        error: 'Liveness verification failed! Static photo or unauthorized video replay detected.',
+        error: 'Liveness verification failed! Static photo or video spoof detected.',
         spoofDetected: true
       });
     }
 
-    // Compute Euclidean distance with stored biometric template
     const distance = calculateEuclideanDistance(user.faceDescriptor, faceDescriptor);
-    // Strict match threshold (Euclidean distance <= 0.50)
     const STRICT_THRESHOLD = 0.50;
     const isMatch = distance <= STRICT_THRESHOLD;
 
@@ -278,16 +387,15 @@ router.post('/face-login', async (req, res) => {
       });
 
       return res.status(401).json({
-        error: `Face does not match registered owner. Biometric distance: ${distance.toFixed(3)} (Threshold: ${STRICT_THRESHOLD})`,
+        error: `Face does not match registered biometric profile. Distance: ${distance.toFixed(3)} (Threshold: ${STRICT_THRESHOLD})`,
         distance
       });
     }
 
-    // Success
     db.addLoginAttempt({
       username: user.username,
       success: true,
-      reason: `Face login authenticated with verified liveness (${livenessAction})`,
+      reason: `Face login authenticated with active liveness (${livenessAction})`,
       ip: location.ip || ip,
       location,
       device,
@@ -297,7 +405,7 @@ router.post('/face-login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '48h' }
     );
 
     const { passwordHash, ...safeUser } = user;
@@ -314,12 +422,20 @@ router.post('/face-login', async (req, res) => {
   }
 });
 
-// Demo Helper: Trigger 4 wrong password attempts instantly for live viva demo
-router.post('/demo-brute-force', async (req, res) => {
+// 6. User Profile / Session Check
+router.get('/me', authenticateToken, (req, res) => {
+  const user = db.findUserById(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+  const { passwordHash, ...safeUser } = user;
+  return res.json({ user: safeUser });
+});
+
+// 7. Security Alert Trigger (Audit / Testing)
+router.post('/simulate-alert', authenticateToken, async (req, res) => {
   try {
     const { targetUsername = 'student1' } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-    const userAgent = req.headers['user-agent'] || 'Modern Web Browser';
+    const userAgent = req.headers['user-agent'] || 'Enterprise Web Browser';
 
     const user = db.findUserByUsername(targetUsername);
     if (!user) {
@@ -330,36 +446,29 @@ router.post('/demo-brute-force', async (req, res) => {
     const device = parseDeviceInfo(userAgent);
 
     let finalAttemptRecord = null;
-
-    // Simulate 4 failed attempts
     for (let i = 1; i <= 4; i++) {
       const count = db.incrementFailedAttempts(targetUsername);
       finalAttemptRecord = db.addLoginAttempt({
         username: targetUsername,
         success: false,
-        reason: `Brute force simulation attempt #${i} (dictionary attack)`,
+        reason: `Automated Intrusion Simulation #${i}`,
         ip: location.ip || ip,
-        location: {
-          ...location,
-          city: i > 2 ? 'Pune' : 'Mumbai'
-        },
+        location: { ...location, city: i > 2 ? 'Pune' : 'Mumbai' },
         device,
         attemptCount: count,
         timestamp: new Date().toISOString()
       });
     }
 
-    // Send email alert for >3 attempts
     const emailRecord = await sendSecurityAlertEmail({
       user,
       attemptDetails: finalAttemptRecord,
       attemptCount: 4
     });
 
-    // Broadcast live socket alert to Admin
     broadcastSecurityAlert({
       type: 'BRUTE_FORCE_THRESHOLD_EXCEEDED',
-      title: '🚨 [DEMO] Multi-Factor Brute Force Alert Triggered!',
+      title: '🚨 Enterprise Intrusion Simulation Triggered',
       username: targetUsername,
       attemptCount: 4,
       location,
@@ -368,21 +477,15 @@ router.post('/demo-brute-force', async (req, res) => {
     });
 
     return res.json({
-      message: `Simulated 4 consecutive wrong password attempts on ${targetUsername}!`,
+      message: `Intrusion test dispatched for ${targetUsername}!`,
       alertDispatched: true,
       emailSentTo: user.email,
       emailId: emailRecord.id,
-      previewUrl: emailRecord.previewUrl,
-      attackerProfile: {
-        ip: location.ip,
-        city: location.city,
-        device: device.device,
-        browser: device.browser
-      }
+      previewUrl: emailRecord.previewUrl
     });
   } catch (err) {
-    console.error('Demo brute force error:', err);
-    return res.status(500).json({ error: 'Failed to simulate brute force.' });
+    console.error('Simulate alert error:', err);
+    return res.status(500).json({ error: 'Failed to simulate alert.' });
   }
 });
 

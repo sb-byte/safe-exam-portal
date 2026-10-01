@@ -14,13 +14,36 @@ export function AuthProvider({ children }) {
   });
   const [token, setToken] = useState(() => localStorage.getItem('secure_exam_token') || null);
   const [showFaceEnrollPrompt, setShowFaceEnrollPrompt] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Validate session on mount
+  useEffect(() => {
+    async function verifySession() {
+      if (token) {
+        try {
+          const res = await authApi.getMe();
+          if (res?.user) {
+            setUser(res.user);
+            localStorage.setItem('secure_exam_user', JSON.stringify(res.user));
+          }
+        } catch (e) {
+          // If token expired, clear session
+          if (e.status === 401 || e.status === 403) {
+            logout();
+          }
+        }
+      }
+      setLoading(false);
+    }
+    verifySession();
+  }, [token]);
 
   const login = (userData, userToken, promptEnrollment = false) => {
     setUser(userData);
     setToken(userToken);
     localStorage.setItem('secure_exam_user', JSON.stringify(userData));
     localStorage.setItem('secure_exam_token', userToken);
-    if (promptEnrollment && !userData.faceEnrolled) {
+    if (promptEnrollment && !userData.faceEnrolled && userData.role === 'student') {
       setShowFaceEnrollPrompt(true);
     }
   };
@@ -41,6 +64,8 @@ export function AuthProvider({ children }) {
   };
 
   const isAdmin = user?.role === 'admin';
+  const isFaculty = user?.role === 'faculty';
+  const canAccessAdmin = isAdmin || isFaculty;
   const isAuthenticated = Boolean(user && token);
 
   return (
@@ -50,6 +75,9 @@ export function AuthProvider({ children }) {
         token,
         isAuthenticated,
         isAdmin,
+        isFaculty,
+        canAccessAdmin,
+        loading,
         login,
         logout,
         updateUser,

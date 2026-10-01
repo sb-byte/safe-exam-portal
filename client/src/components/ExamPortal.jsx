@@ -47,6 +47,9 @@ export default function ExamPortal({ onExitExam }) {
         setLoading(true);
         const data = await examApi.getQuestions();
         setExamData(data);
+        if (data.durationMinutes) {
+          setTimeLeft(data.durationMinutes * 60);
+        }
       } catch (err) {
         setError(err.message || 'Failed to load exam questions.');
       } finally {
@@ -182,11 +185,13 @@ export default function ExamPortal({ onExitExam }) {
 
     setIsSubmitting(true);
     try {
+      const totalDurationSecs = (examData?.durationMinutes || 15) * 60;
       const res = await examApi.submitExam({
+        examId: examData?.examId,
         studentId,
         studentName,
         answers,
-        timeSpentSeconds: 600 - timeLeft
+        timeSpentSeconds: Math.max(0, totalDurationSecs - timeLeft)
       });
 
       setSubmissionResult(res);

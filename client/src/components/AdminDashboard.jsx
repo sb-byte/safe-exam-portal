@@ -23,6 +23,7 @@ import {
   Filter,
   Maximize2
 } from 'lucide-react';
+import QuestionStudio from './QuestionStudio';
 
 export default function AdminDashboard({ onOpenEmailViewer }) {
   const { isConnected, securityAlerts, proctoringEvents: socketEvents, latestScoreUpdate } = useSocket();
@@ -220,6 +221,18 @@ export default function AdminDashboard({ onOpenEmailViewer }) {
           >
             <Sparkles className="w-4 h-4 stroke-[2.5]" />
             <span>4. AI / Syllabus Research Lab (Exp 1-8)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('studio')}
+            className={`py-3 px-5 text-xs font-black rounded-t-xl transition-all flex items-center gap-2 border-2 border-black border-b-0 uppercase ${
+              activeTab === 'studio'
+                ? 'bg-[#fb923c] text-black shadow-neo translate-y-0.5'
+                : 'bg-white text-slate-800 hover:bg-[#f8f5ee]'
+            }`}
+          >
+            <Sliders className="w-4 h-4 stroke-[2.5]" />
+            <span>5. Question Bank & Exam Studio</span>
           </button>
         </div>
       </div>
@@ -785,6 +798,11 @@ export default function AdminDashboard({ onOpenEmailViewer }) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 5: Question Bank & Exam Studio */}
+        {activeTab === 'studio' && (
+          <QuestionStudio onQuestionsUpdated={fetchData} />
         )}
       </div>
 

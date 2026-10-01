@@ -157,6 +157,35 @@
   },
   "loginAttempts": [
     {
+      "id": "att_1790866230702_vai3d",
+      "timestamp": "2026-10-01T14:50:30.702Z",
+      "username": "student1",
+      "success": false,
+      "reason": "Face biometric mismatch (Distance: 1.263 > 0.5)",
+      "ip": "1",
+      "location": {
+        "ip": "1",
+        "city": "Pune",
+        "region": "Maharashtra",
+        "country": "India",
+        "countryCode": "IN",
+        "isp": "College Campus Network / High-Speed Broadband",
+        "lat": 18.5204,
+        "lon": 73.8567,
+        "timezone": "Asia/Kolkata",
+        "isLocal": true,
+        "query": "1"
+      },
+      "device": {
+        "raw": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+        "browser": "Chrome v154.0.0.0",
+        "os": "macOS 10.15.7",
+        "device": "Desktop / Laptop PC",
+        "cpu": "ARM64 / x86_64"
+      },
+      "attemptCount": 1
+    },
+    {
       "id": "att_1790747314328_3nuu5",
       "timestamp": "2026-09-30T05:48:34.328Z",
       "username": "student1",
