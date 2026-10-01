@@ -13,8 +13,7 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
-  ShieldAlert,
-  Laptop
+  ShieldAlert
 } from 'lucide-react';
 
 export default function Navbar({
@@ -27,19 +26,17 @@ export default function Navbar({
   const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [demoNotice, setDemoNotice] = useState(null);
 
-  // Quick 1-Click Demo Trigger: 4 Wrong Passwords
   const handleQuickBruteForce = async () => {
     setShowDemoMenu(false);
     try {
       const res = await authApi.triggerDemoBruteForce(user?.username || 'student1');
-      setDemoNotice(`🚨 4 Wrong Passwords Triggered! Nodemailer security alert sent to ${res.emailSentTo} and logged to Admin.`);
+      setDemoNotice(`🚨 4 Wrong Passwords Triggered! Security alert email dispatched to ${res.emailSentTo} and logged to Admin.`);
       setTimeout(() => setDemoNotice(null), 5000);
     } catch (e) {
       setDemoNotice('Demo trigger failed.');
     }
   };
 
-  // Quick 1-Click Demo Trigger: Siren
   const handleQuickSiren = () => {
     setShowDemoMenu(false);
     siren.playSiren(3000);
@@ -49,35 +46,37 @@ export default function Navbar({
 
   return (
     <>
-      <header className="sticky top-0 z-40 cyber-glass border-b border-slate-800 px-4 sm:px-8 py-3">
+      <header className="sticky top-0 z-40 bg-white border-b-4 border-black px-4 sm:px-8 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Logo & Brand */}
           <div
             onClick={() => setCurrentView('landing')}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-              <Shield className="w-5 h-5 text-slate-950 fill-slate-950" />
+            <div className="w-10 h-10 rounded-lg bg-[#ffe600] border-2 border-black shadow-neo flex items-center justify-center text-black font-black group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 group-hover:shadow-neo-md transition-all">
+              <Shield className="w-6 h-6 text-black fill-black" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-base tracking-tight text-white font-display">
-                  Secure<span className="text-cyan-400">Exam</span>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-xl tracking-tight text-black font-display uppercase">
+                  Secure<span className="bg-[#ffe600] px-1 border border-black shadow-[1px_1px_0px_#000]">Exam</span>
                 </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] border border-black animate-pulse" />
               </div>
-              <p className="text-[10px] font-mono text-slate-400 -mt-0.5">
-                AI PROCTORING & BIOMETRIC AUTH
+              <p className="text-[10px] font-mono font-bold text-slate-700 tracking-wider">
+                AI PROCTORING & BIOMETRICS
               </p>
             </div>
           </div>
 
           {/* Center Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+          <nav className="hidden md:flex items-center gap-2 bg-[#f8f5ee] p-1.5 rounded-xl border-2 border-black shadow-neo-sm text-xs font-bold">
             <button
               onClick={() => setCurrentView('landing')}
-              className={`px-3.5 py-1.5 rounded-lg transition-colors ${
-                currentView === 'landing' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-300 hover:text-white'
+              className={`px-4 py-1.5 rounded-lg transition-all ${
+                currentView === 'landing'
+                  ? 'bg-[#ffe600] text-black border-2 border-black shadow-neo-sm font-black'
+                  : 'text-black hover:bg-white hover:border-black'
               }`}
             >
               Overview
@@ -85,8 +84,10 @@ export default function Navbar({
 
             <button
               onClick={() => setCurrentView('exam')}
-              className={`px-3.5 py-1.5 rounded-lg transition-colors ${
-                currentView === 'exam' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-300 hover:text-white'
+              className={`px-4 py-1.5 rounded-lg transition-all ${
+                currentView === 'exam'
+                  ? 'bg-[#38bdf8] text-black border-2 border-black shadow-neo-sm font-black'
+                  : 'text-black hover:bg-white hover:border-black'
               }`}
             >
               Candidate Exam
@@ -94,8 +95,10 @@ export default function Navbar({
 
             <button
               onClick={() => setCurrentView('admin')}
-              className={`px-3.5 py-1.5 rounded-lg transition-colors ${
-                currentView === 'admin' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-300 hover:text-white'
+              className={`px-4 py-1.5 rounded-lg transition-all ${
+                currentView === 'admin'
+                  ? 'bg-[#f472b6] text-black border-2 border-black shadow-neo-sm font-black'
+                  : 'text-black hover:bg-white hover:border-black'
               }`}
             >
               Admin Dashboard
@@ -103,43 +106,43 @@ export default function Navbar({
           </nav>
 
           {/* Right Action Tools & Auth */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             {/* Quick Demo Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowDemoMenu(!showDemoMenu)}
-                className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-[#fb923c] text-black text-xs font-black neo-btn flex items-center gap-1.5"
               >
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <Zap className="w-4 h-4 text-black fill-black" />
                 <span className="hidden sm:inline">⚡ Viva Demo Tools</span>
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3.5 h-3.5 stroke-[3]" />
               </button>
 
               {showDemoMenu && (
-                <div className="absolute right-0 mt-2 w-64 cyber-card rounded-2xl p-2 border border-slate-700 shadow-2xl z-50 text-xs space-y-1 animate-fadeIn">
-                  <div className="px-3 py-1 text-[10px] font-mono text-slate-400 uppercase border-b border-slate-800">
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl p-2.5 border-3 border-black shadow-neo-lg z-50 text-xs space-y-1.5 animate-fadeIn font-bold">
+                  <div className="px-2 py-1 text-[10px] font-mono text-black font-black uppercase border-b-2 border-black bg-[#ffe600] rounded mb-1">
                     Instant Demo Shortcuts
                   </div>
                   <button
                     onClick={handleQuickBruteForce}
-                    className="w-full text-left p-2 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-[#fed7aa] border-2 border-black shadow-neo-sm text-black flex items-center gap-2 transition-all"
                   >
-                    <ShieldAlert className="w-4 h-4 text-red-400" />
+                    <ShieldAlert className="w-4 h-4 text-[#ef4444]" />
                     <span>Trigger 4 Wrong Passwords (Email Alert)</span>
                   </button>
                   <button
                     onClick={handleQuickSiren}
-                    className="w-full text-left p-2 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-[#fef08a] border-2 border-black shadow-neo-sm text-black flex items-center gap-2 transition-all"
                   >
-                    <Volume2 className="w-4 h-4 text-amber-400" />
+                    <Volume2 className="w-4 h-4 text-[#eab308]" />
                     <span>Play Proctoring Warning Siren</span>
                   </button>
                   <button
                     onClick={() => { setShowDemoMenu(false); onOpenAuth('face-login'); }}
-                    className="w-full text-left p-2 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-[#bae6fd] border-2 border-black shadow-neo-sm text-black flex items-center gap-2 transition-all"
                   >
-                    <ScanFace className="w-4 h-4 text-cyan-400" />
+                    <ScanFace className="w-4 h-4 text-[#0284c7]" />
                     <span>Test Face Login & Liveness</span>
                   </button>
                 </div>
@@ -150,42 +153,42 @@ export default function Navbar({
             <button
               onClick={onOpenEmailInbox}
               title="View Dispatched Security Alert Emails"
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-cyan-500/40 transition-colors relative"
+              className="p-2.5 rounded-xl bg-white text-black neo-btn relative"
             >
-              <Mail className="w-4 h-4 text-cyan-400" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+              <Mail className="w-4 h-4 text-black stroke-[2.5]" />
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ef4444] border-2 border-black rounded-full" />
             </button>
 
             {/* User Profile or Login Trigger */}
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-                  <div className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[10px]">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#86efac] border-2 border-black shadow-neo-sm text-xs font-bold">
+                  <div className="w-6 h-6 rounded bg-white border border-black flex items-center justify-center font-black text-xs text-black">
                     {user.fullName?.charAt(0) || user.username?.charAt(0)}
                   </div>
                   <div className="hidden sm:block text-left">
-                    <span className="font-semibold text-slate-200 block leading-none">{user.username}</span>
-                    <span className="text-[10px] text-cyan-400 font-mono">{user.role}</span>
+                    <span className="font-extrabold text-black block leading-none">{user.username}</span>
+                    <span className="text-[10px] text-slate-800 font-mono uppercase font-bold">{user.role}</span>
                   </div>
                   {user.faceEnrolled && (
-                    <ScanFace className="w-3.5 h-3.5 text-emerald-400" title="Face Login Enabled" />
+                    <ScanFace className="w-4 h-4 text-black stroke-[2.5]" title="Face Login Enabled" />
                   )}
                 </div>
 
                 <button
                   onClick={logout}
                   title="Sign Out"
-                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+                  className="p-2 rounded-xl bg-[#fca5a5] text-black neo-btn"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => onOpenAuth('login')}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-cyan-500/20 flex items-center gap-1.5"
+                className="px-4 py-2 bg-[#ffe600] text-black font-black rounded-xl text-xs neo-btn flex items-center gap-1.5 uppercase tracking-wide"
               >
-                <User className="w-3.5 h-3.5" />
+                <User className="w-4 h-4 stroke-[2.5]" />
                 <span>Sign In / Register</span>
               </button>
             )}
@@ -195,10 +198,10 @@ export default function Navbar({
 
       {/* Floating Demo Feedback Notice */}
       {demoNotice && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-md p-3.5 rounded-2xl cyber-card border border-cyan-500/50 shadow-2xl text-xs text-cyan-200 animate-slideUp flex items-start gap-2.5">
-          <Sparkles className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">{demoNotice}</div>
-          <button onClick={() => setDemoNotice(null)} className="text-slate-400 hover:text-white">✕</button>
+        <div className="fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-xl bg-[#ffe600] border-3 border-black shadow-neo-lg text-xs font-bold text-black animate-slideUp flex items-start gap-2.5">
+          <Sparkles className="w-5 h-5 text-black flex-shrink-0 mt-0.5 fill-black" />
+          <div className="flex-1 leading-snug">{demoNotice}</div>
+          <button onClick={() => setDemoNotice(null)} className="text-black font-black text-sm hover:scale-125 transition-transform">✕</button>
         </div>
       )}
     </>

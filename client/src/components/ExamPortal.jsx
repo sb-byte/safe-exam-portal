@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { examApi } from '../services/api';
 import ProctoringMonitor from './ProctoringMonitor';
@@ -24,28 +24,23 @@ import {
 export default function ExamPortal({ onExitExam }) {
   const { user } = useAuth();
 
-  // Exam questions and state
   const [examData, setExamData] = useState(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Timer: 10 minutes (600 seconds)
   const [timeLeft, setTimeLeft] = useState(600);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
 
-  // Proctoring states
   const [isCameraCompulsoryBlocked, setIsCameraCompulsoryBlocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [warningToast, setWarningToast] = useState(null);
 
-  // Active student identifier
   const studentId = user?.id || 'usr_demo_student';
   const studentName = user?.fullName || user?.username || 'Alex Mercer';
 
-  // Load Exam Questions
   useEffect(() => {
     async function fetchQuestions() {
       try {
@@ -61,7 +56,6 @@ export default function ExamPortal({ onExitExam }) {
     fetchQuestions();
   }, []);
 
-  // Timer countdown
   useEffect(() => {
     if (submissionResult || timeLeft <= 0) return;
 
@@ -79,7 +73,6 @@ export default function ExamPortal({ onExitExam }) {
     return () => clearInterval(timer);
   }, [submissionResult, timeLeft]);
 
-  // Toast auto-clear
   const showToast = useCallback((msg, type = 'warning') => {
     setWarningToast({ message: msg, type });
     setTimeout(() => {
@@ -87,7 +80,6 @@ export default function ExamPortal({ onExitExam }) {
     }, 4500);
   }, []);
 
-  // Proctoring event logger helper
   const logEvent = useCallback(async (type, details, severity = 'WARNING') => {
     try {
       await examApi.logEvent({
@@ -102,14 +94,9 @@ export default function ExamPortal({ onExitExam }) {
     }
   }, [studentId, studentName]);
 
-  // ANTI-CHEATING LISTENERS REQUIREMENT:
-  // 1. Switching tab or window -> Logged and warned
-  // 2. Leaving fullscreen -> Logged and warned
-  // 3. Copy / paste / right click -> Blocked and logged
   useEffect(() => {
     if (submissionResult) return;
 
-    // A. Tab / Window Switch
     const handleVisibilityChange = () => {
       if (document.hidden) {
         showToast('⚠️ WARNING: Switching tabs is recorded as an integrity violation!', 'danger');
@@ -122,7 +109,6 @@ export default function ExamPortal({ onExitExam }) {
       logEvent('TAB_SWITCH', 'Candidate clicked outside browser window (Window blur)', 'WARNING');
     };
 
-    // B. Fullscreen Change
     const handleFullscreenChange = () => {
       const isNowFull = Boolean(document.fullscreenElement);
       setIsFullscreen(isNowFull);
@@ -132,7 +118,6 @@ export default function ExamPortal({ onExitExam }) {
       }
     };
 
-    // C. Copy / Paste / Cut Block
     const handleCopy = (e) => {
       e.preventDefault();
       showToast('🚫 Copying question text is strictly disabled!', 'danger');
@@ -170,7 +155,6 @@ export default function ExamPortal({ onExitExam }) {
     };
   }, [submissionResult, showToast, logEvent]);
 
-  // Request Fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -179,7 +163,6 @@ export default function ExamPortal({ onExitExam }) {
     }
   };
 
-  // Select Option
   const handleSelectOption = (questionId, optionIndex) => {
     if (isCameraCompulsoryBlocked) {
       showToast('🚫 Camera is required! Turn camera on to answer questions.', 'danger');
@@ -191,7 +174,6 @@ export default function ExamPortal({ onExitExam }) {
     }));
   };
 
-  // Submit Exam
   const handleSubmitExam = async () => {
     if (isCameraCompulsoryBlocked) {
       showToast('🚫 Camera is required! Turn camera on to submit.', 'danger');
@@ -211,8 +193,8 @@ export default function ExamPortal({ onExitExam }) {
 
       if (res.cheatingAnalysis?.classification === 'HONEST') {
         confetti({
-          particleCount: 80,
-          spread: 70,
+          particleCount: 90,
+          spread: 80,
           origin: { y: 0.6 }
         });
       }
@@ -223,7 +205,6 @@ export default function ExamPortal({ onExitExam }) {
     }
   };
 
-  // Format Timer mm:ss
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -232,10 +213,10 @@ export default function ExamPortal({ onExitExam }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#070a12] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-mono text-cyan-300">Loading Secure Examination Session...</p>
+      <div className="min-h-screen bg-[#f8f5ee] flex items-center justify-center neo-grid-bg">
+        <div className="bg-white p-8 rounded-2xl border-4 border-black shadow-neo-lg flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-black border-t-[#ffe600] rounded-full animate-spin" />
+          <p className="text-sm font-black font-mono uppercase text-black">Loading Examination Session...</p>
         </div>
       </div>
     );
@@ -243,14 +224,14 @@ export default function ExamPortal({ onExitExam }) {
 
   if (error || !examData) {
     return (
-      <div className="min-h-screen bg-[#070a12] flex items-center justify-center p-4">
-        <div className="cyber-card rounded-2xl p-6 text-center max-w-md">
-          <AlertOctagon className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-white mb-2">Exam Portal Error</h3>
-          <p className="text-xs text-slate-400 mb-4">{error || 'Could not load exam data'}</p>
+      <div className="min-h-screen bg-[#f8f5ee] flex items-center justify-center p-4 neo-grid-bg">
+        <div className="bg-white rounded-2xl p-8 text-center max-w-md border-4 border-black shadow-neo-lg">
+          <AlertOctagon className="w-14 h-14 text-[#dc2626] mx-auto mb-3 stroke-[2.5]" />
+          <h3 className="text-xl font-black text-black uppercase mb-2">Exam Portal Error</h3>
+          <p className="text-xs font-bold text-slate-700 mb-6">{error || 'Could not load exam data'}</p>
           <button
             onClick={onExitExam}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl"
+            className="px-6 py-3 bg-[#ffe600] text-black text-xs font-black rounded-xl neo-btn uppercase"
           >
             Return to Dashboard
           </button>
@@ -265,7 +246,7 @@ export default function ExamPortal({ onExitExam }) {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex flex-col relative select-none">
+    <div className="min-h-screen bg-[#f8f5ee] text-black flex flex-col relative select-none neo-grid-bg">
       {/* Proctoring HUD Camera Monitor */}
       <ProctoringMonitor
         studentId={studentId}
@@ -276,50 +257,50 @@ export default function ExamPortal({ onExitExam }) {
 
       {/* Floating Warning Toast */}
       {warningToast && (
-        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center gap-3 text-xs font-semibold animate-bounce ${
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-xl border-3 border-black shadow-neo-lg flex items-center gap-3 text-xs font-black animate-bounce ${
           warningToast.type === 'danger'
-            ? 'bg-red-950/90 border-red-500 text-red-200 shadow-red-500/30'
-            : 'bg-amber-950/90 border-amber-500 text-amber-200'
+            ? 'bg-[#fee2e2] text-black'
+            : 'bg-[#fef3c7] text-black'
         }`}>
-          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 text-[#dc2626] flex-shrink-0 stroke-[3]" />
           <span>{warningToast.message}</span>
         </div>
       )}
 
       {/* Top Examination Navigation Bar */}
-      <header className="sticky top-0 z-30 cyber-glass border-b border-slate-800 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white border-b-4 border-black px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <Shield className="w-4 h-4" />
+          <div className="w-9 h-9 rounded-lg bg-[#ffe600] border-2 border-black shadow-neo-sm flex items-center justify-center text-black">
+            <Shield className="w-5 h-5 stroke-[2.5]" />
           </div>
           <div>
-            <h1 className="text-sm sm:text-base font-bold text-white font-display">
+            <h1 className="text-sm sm:text-base font-black text-black font-display uppercase tracking-tight">
               {examData.examTitle}
             </h1>
-            <p className="text-[11px] text-slate-400 font-mono">
-              Candidate: <span className="text-cyan-300 font-semibold">{studentName}</span> • Session ID: <span className="text-slate-500">{studentId.slice(0, 8)}</span>
+            <p className="text-[11px] text-slate-800 font-mono font-bold">
+              Candidate: <span className="bg-[#38bdf8] px-1 border border-black rounded">{studentName}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-6">
+        <div className="flex items-center gap-3 sm:gap-5">
           {/* Fullscreen Mode Toggle */}
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white hover:border-slate-700 transition-colors"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f8f5ee] border-2 border-black shadow-neo-sm text-xs font-black text-black hover:bg-white transition-all"
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-cyan-400" /> : <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{isFullscreen ? 'Fullscreen' : 'Full Screen'}</span>
+            {isFullscreen ? <Minimize2 className="w-4 h-4 stroke-[2.5]" /> : <Maximize2 className="w-4 h-4 stroke-[2.5]" />}
+            <span>{isFullscreen ? 'Exit Full' : 'Fullscreen'}</span>
           </button>
 
           {/* Countdown Timer */}
-          <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono text-sm font-bold border ${
+          <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono text-sm font-black border-2 border-black shadow-neo-sm ${
             timeLeft < 120
-              ? 'bg-red-950/60 border-red-500 text-red-300 animate-pulse'
-              : 'bg-slate-900/80 border-cyan-500/40 text-cyan-300'
+              ? 'bg-[#fee2e2] text-[#dc2626] animate-pulse'
+              : 'bg-[#ffe600] text-black'
           }`}>
-            <Clock className="w-4 h-4" />
+            <Clock className="w-4 h-4 stroke-[2.5]" />
             <span>{formatTime(timeLeft)}</span>
           </div>
 
@@ -328,13 +309,13 @@ export default function ExamPortal({ onExitExam }) {
             <button
               onClick={handleSubmitExam}
               disabled={isSubmitting || isCameraCompulsoryBlocked}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide flex items-center gap-1.5 ${
                 isCameraCompulsoryBlocked
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/20'
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed border-2 border-black'
+                  : 'bg-[#86efac] hover:bg-[#4ade80] text-black neo-btn'
               }`}
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>{isSubmitting ? 'Submitting...' : 'Submit Exam'}</span>
             </button>
           )}
@@ -347,19 +328,19 @@ export default function ExamPortal({ onExitExam }) {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Left 3 Cols: Active Question Card */}
             <div className="lg:col-span-3 space-y-6">
-              <div className="cyber-card rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl">
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border-3 border-black shadow-neo-lg">
                 {/* Category & Question Counter */}
-                <div className="flex items-center justify-between mb-4">
-                  <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-black">
+                  <span className="neo-badge bg-[#38bdf8] text-black px-3 py-1 text-xs">
                     {currentQ.category}
                   </span>
-                  <span className="text-xs font-mono text-slate-400">
+                  <span className="text-xs font-mono font-black text-slate-800">
                     Question {currentIdx + 1} of {questions.length}
                   </span>
                 </div>
 
                 {/* Question Prompt */}
-                <h2 className="text-base sm:text-lg font-semibold text-slate-100 mb-6 leading-relaxed">
+                <h2 className="text-base sm:text-xl font-black text-black mb-6 leading-relaxed">
                   {currentQ.question}
                 </h2>
 
@@ -372,35 +353,35 @@ export default function ExamPortal({ onExitExam }) {
                         key={optIdx}
                         type="button"
                         onClick={() => handleSelectOption(currentQ.id, optIdx)}
-                        className={`w-full p-4 rounded-xl text-left text-sm transition-all border flex items-center justify-between group ${
+                        className={`w-full p-4 rounded-xl text-left text-sm transition-all border-2 border-black flex items-center justify-between group ${
                           isSelected
-                            ? 'bg-cyan-500/15 border-cyan-400 text-cyan-200 shadow-glow font-medium'
-                            : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-850 hover:border-slate-700'
+                            ? 'bg-[#ffe600] text-black font-black shadow-neo translate-x-1'
+                            : 'bg-white text-slate-900 font-bold hover:bg-[#f8f5ee] shadow-neo-sm hover:translate-x-0.5'
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-mono font-bold ${
-                            isSelected ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-400 group-hover:text-slate-200'
+                          <span className={`w-7 h-7 rounded-lg border-2 border-black flex items-center justify-center text-xs font-mono font-black ${
+                            isSelected ? 'bg-black text-[#ffe600]' : 'bg-[#f8f5ee] text-black group-hover:bg-[#ffe600]'
                           }`}>
                             {String.fromCharCode(65 + optIdx)}
                           </span>
-                          <span>{option}</span>
+                          <span className="text-black">{option}</span>
                         </div>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-cyan-400 flex-shrink-0 ml-2" />}
+                        {isSelected && <CheckCircle2 className="w-5 h-5 text-black stroke-[3] flex-shrink-0 ml-2" />}
                       </button>
                     );
                   })}
                 </div>
 
                 {/* Bottom Pagination Controls */}
-                <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800/80">
+                <div className="flex items-center justify-between mt-8 pt-6 border-t-2 border-black">
                   <button
                     type="button"
                     onClick={() => setCurrentIdx(prev => Math.max(prev - 1, 0))}
                     disabled={currentIdx === 0}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="px-4 py-2.5 rounded-xl text-xs font-black bg-white border-2 border-black shadow-neo-sm text-black hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 uppercase"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4 stroke-[3]" />
                     <span>Previous</span>
                   </button>
 
@@ -409,19 +390,19 @@ export default function ExamPortal({ onExitExam }) {
                       type="button"
                       onClick={handleSubmitExam}
                       disabled={isSubmitting || isCameraCompulsoryBlocked}
-                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 flex items-center gap-1.5"
+                      className="px-6 py-2.5 rounded-xl text-xs font-black bg-[#86efac] hover:bg-[#4ade80] text-black neo-btn flex items-center gap-1.5 uppercase tracking-wide"
                     >
                       <span>Final Submit</span>
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-4 h-4 stroke-[3]" />
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setCurrentIdx(prev => Math.min(prev + 1, questions.length - 1))}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold flex items-center gap-1.5 transition-colors"
+                      className="px-5 py-2.5 rounded-xl text-xs bg-[#ffe600] hover:bg-[#fde047] text-black font-black neo-btn flex items-center gap-1.5 uppercase tracking-wide"
                     >
                       <span>Next Question</span>
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-4 h-4 stroke-[3]" />
                     </button>
                   )}
                 </div>
@@ -430,8 +411,8 @@ export default function ExamPortal({ onExitExam }) {
 
             {/* Right 1 Col: Question Navigation Palette */}
             <div className="space-y-4">
-              <div className="cyber-card rounded-2xl p-5 border border-slate-800">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 font-mono">
+              <div className="bg-white rounded-2xl p-5 border-3 border-black shadow-neo-md">
+                <h3 className="text-xs font-black uppercase tracking-wider text-black mb-3 font-mono">
                   Question Palette
                 </h3>
 
@@ -444,12 +425,12 @@ export default function ExamPortal({ onExitExam }) {
                         key={q.id}
                         type="button"
                         onClick={() => setCurrentIdx(idx)}
-                        className={`aspect-square rounded-xl text-xs font-mono font-bold transition-all border flex items-center justify-center ${
+                        className={`aspect-square rounded-lg text-xs font-mono font-black transition-all border-2 border-black flex items-center justify-center ${
                           isCurrent
-                            ? 'border-cyan-400 bg-cyan-500 text-slate-950 shadow-glow'
+                            ? 'bg-[#ffe600] text-black shadow-neo-sm scale-105'
                             : isAnswered
-                            ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
-                            : 'border-slate-800 bg-slate-900 text-slate-500 hover:text-slate-200'
+                            ? 'bg-[#86efac] text-black shadow-neo-sm'
+                            : 'bg-white text-slate-800 hover:bg-[#f8f5ee]'
                         }`}
                       >
                         {idx + 1}
@@ -458,31 +439,31 @@ export default function ExamPortal({ onExitExam }) {
                   })}
                 </div>
 
-                <div className="space-y-2 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <div className="space-y-2 pt-3 border-t-2 border-black text-xs font-bold text-black">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded bg-[#86efac] border border-black" />
                       <span>Answered:</span>
                     </span>
-                    <span className="font-mono text-emerald-400 font-bold">{answeredCount}</span>
+                    <span className="font-mono font-black">{answeredCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-slate-600" />
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded bg-white border border-black" />
                       <span>Remaining:</span>
                     </span>
-                    <span className="font-mono text-slate-300">{questions.length - answeredCount}</span>
+                    <span className="font-mono font-black">{questions.length - answeredCount}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Proctoring Rules Summary Card */}
-              <div className="cyber-card rounded-2xl p-4 border border-slate-800 text-[11px] space-y-2 text-slate-400">
-                <div className="flex items-center gap-1.5 text-cyan-300 font-semibold">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Continuous AI Supervision:</span>
+              {/* Rules Summary Card */}
+              <div className="bg-[#fef3c7] rounded-2xl p-4 border-2 border-black shadow-neo-sm text-xs font-bold space-y-2 text-black">
+                <div className="flex items-center gap-1.5 uppercase font-black">
+                  <Shield className="w-4 h-4 stroke-[2.5]" />
+                  <span>AI Proctoring Strict Rules:</span>
                 </div>
-                <ul className="space-y-1 list-disc list-inside text-slate-400">
+                <ul className="space-y-1 list-disc list-inside font-medium text-slate-900 text-[11px]">
                   <li>Keep camera active continuously</li>
                   <li>Do not switch tabs or windows</li>
                   <li>Avoid looking away from display</li>
@@ -495,49 +476,50 @@ export default function ExamPortal({ onExitExam }) {
           /* POST-EXAM INTEGRITY & SCORECARD REPORT */
           <div className="space-y-6 animate-fadeIn">
             {/* Header Result Card */}
-            <div className="cyber-card rounded-2xl p-6 sm:p-8 border border-cyan-500/30 text-center relative overflow-hidden">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 shadow-glow">
-                <Award className="w-8 h-8" />
+            <div className="bg-white rounded-2xl p-8 border-4 border-black shadow-neo-xl text-center">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-[#ffe600] border-3 border-black shadow-neo flex items-center justify-center text-black mb-4">
+                <Award className="w-9 h-9 stroke-[2.5]" />
               </div>
 
-              <h2 className="text-2xl font-bold text-white font-display mb-1">
-                Exam Completed & Evaluated
+              <span className="neo-badge bg-[#86efac] text-black px-3 py-1 text-xs">Evaluation Complete</span>
+              <h2 className="text-3xl font-black text-black font-display uppercase tracking-tight mt-2 mb-1">
+                Exam Evaluated & Audited
               </h2>
-              <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
+              <p className="text-xs font-semibold text-slate-700 max-w-md mx-auto mb-6">
                 Your responses and continuous multi-sensor proctoring telemetry have been verified by the AI Integrity Engine.
               </p>
 
               {/* Score Badges Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-6">
                 {/* Academic Score */}
-                <div className="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
-                  <span className="text-xs text-slate-400 font-medium">Academic Score</span>
-                  <div className="text-2xl font-extrabold text-cyan-400 font-mono mt-1">
+                <div className="bg-[#e0f2fe] rounded-xl p-4 border-3 border-black shadow-neo text-black">
+                  <span className="text-xs font-mono font-black uppercase">Academic Score</span>
+                  <div className="text-3xl font-black font-mono mt-1">
                     {submissionResult.submission.percentage}%
                   </div>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-xs font-bold">
                     {submissionResult.submission.correctCount} / {submissionResult.submission.totalQuestions} Correct
                   </span>
                 </div>
 
                 {/* AI Cheating Risk Score */}
-                <div className="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
-                  <span className="text-xs text-slate-400 font-medium">AI Cheating Risk Score</span>
-                  <div className="text-2xl font-extrabold font-mono mt-1" style={{ color: submissionResult.cheatingAnalysis.badgeColor }}>
+                <div className="bg-[#fee2e2] rounded-xl p-4 border-3 border-black shadow-neo text-black">
+                  <span className="text-xs font-mono font-black uppercase">Cheating Risk Score</span>
+                  <div className="text-3xl font-black font-mono mt-1 text-[#dc2626]">
                     {submissionResult.cheatingAnalysis.score}%
                   </div>
-                  <span className="text-[11px] font-bold" style={{ color: submissionResult.cheatingAnalysis.badgeColor }}>
+                  <span className="text-xs font-black uppercase">
                     {submissionResult.cheatingAnalysis.classification}
                   </span>
                 </div>
 
                 {/* Integrity Status */}
-                <div className="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
-                  <span className="text-xs text-slate-400 font-medium">Proctoring Verdict</span>
-                  <div className="text-sm font-bold text-white mt-2">
+                <div className="bg-[#dcfce7] rounded-xl p-4 border-3 border-black shadow-neo text-black">
+                  <span className="text-xs font-mono font-black uppercase">Proctoring Verdict</span>
+                  <div className="text-sm font-black mt-2 uppercase">
                     {submissionResult.cheatingAnalysis.statusText}
                   </div>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-xs font-bold">
                     {submissionResult.cheatingAnalysis.totalEvents} Telemetry Flags
                   </span>
                 </div>
@@ -546,7 +528,7 @@ export default function ExamPortal({ onExitExam }) {
               <div className="flex justify-center gap-3">
                 <button
                   onClick={onExitExam}
-                  className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/20"
+                  className="px-8 py-3.5 bg-[#ffe600] hover:bg-[#fde047] text-black font-black rounded-xl text-sm neo-btn uppercase tracking-wide"
                 >
                   Return to Main Portal
                 </button>
@@ -554,19 +536,21 @@ export default function ExamPortal({ onExitExam }) {
             </div>
 
             {/* Detailed Integrity Telemetry Breakdown */}
-            <div className="cyber-card rounded-2xl p-6 border border-slate-800">
-              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-cyan-400" />
+            <div className="bg-white rounded-2xl p-6 border-3 border-black shadow-neo-lg">
+              <h3 className="text-sm font-black text-black mb-4 uppercase flex items-center gap-2">
+                <Shield className="w-5 h-5 stroke-[2.5]" />
                 <span>Cheating Score Factors Breakdown (Ensemble Model)</span>
               </h3>
 
               <div className="space-y-3">
                 {submissionResult.cheatingAnalysis.breakdown.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs">
-                    <span className="text-slate-300 font-medium">{item.factor}</span>
+                  <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl bg-[#f8f5ee] border-2 border-black text-xs font-bold">
+                    <span className="text-black">{item.factor}</span>
                     <div className="flex items-center gap-4 font-mono">
-                      <span className="text-slate-400">Instances: <strong className="text-slate-200">{item.count}</strong></span>
-                      <span className={item.penalty > 0 ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>
+                      <span>Instances: <strong>{item.count}</strong></span>
+                      <span className={`px-2 py-0.5 rounded border border-black ${
+                        item.penalty > 0 ? 'bg-[#fee2e2] text-[#dc2626]' : 'bg-[#dcfce7] text-[#15803d]'
+                      }`}>
                         +{item.penalty} pts
                       </span>
                     </div>
@@ -576,23 +560,25 @@ export default function ExamPortal({ onExitExam }) {
             </div>
 
             {/* Answer Explanations Review */}
-            <div className="cyber-card rounded-2xl p-6 border border-slate-800 space-y-4">
-              <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                <FileQuestion className="w-4 h-4 text-cyan-400" />
+            <div className="bg-white rounded-2xl p-6 border-3 border-black shadow-neo-lg space-y-4">
+              <h3 className="text-sm font-black text-black mb-2 uppercase flex items-center gap-2">
+                <FileQuestion className="w-5 h-5 stroke-[2.5]" />
                 <span>Question-by-Question Solution Review</span>
               </h3>
 
               {submissionResult.submission.reviewedAnswers.map((item, idx) => (
-                <div key={idx} className={`p-4 rounded-xl border text-xs space-y-2 ${
-                  item.isCorrect ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-red-950/20 border-red-500/30'
+                <div key={idx} className={`p-4 rounded-xl border-2 border-black shadow-neo-sm text-xs space-y-2 ${
+                  item.isCorrect ? 'bg-[#dcfce7]' : 'bg-[#fee2e2]'
                 }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-semibold text-slate-400">Question {idx + 1} • {item.category}</span>
-                    <span className={item.isCorrect ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="font-mono uppercase">Question {idx + 1} • {item.category}</span>
+                    <span className={`px-2 py-0.5 rounded border border-black uppercase ${
+                      item.isCorrect ? 'bg-[#86efac] text-black' : 'bg-[#fca5a5] text-black'
+                    }`}>
                       {item.isCorrect ? '✓ Correct (+10 pts)' : '✕ Incorrect'}
                     </span>
                   </div>
-                  <p className="text-slate-300 font-medium">{item.explanation}</p>
+                  <p className="font-semibold text-slate-800">{item.explanation}</p>
                 </div>
               ))}
             </div>

@@ -35,7 +35,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
+    <div className="min-h-screen bg-[#f8f5ee] text-[#111111] flex flex-col font-sans selection:bg-[#ffe600] selection:text-black">
       {/* Top Navigation Bar */}
       <Navbar
         currentView={currentView}
@@ -46,18 +46,18 @@ function AppContent() {
 
       {/* Global Socket Security Alert Banner (appears live if brute force happens!) */}
       {securityAlerts.length > 0 && (
-        <div className="bg-red-950/90 border-b border-red-500/60 px-4 py-2.5 flex items-center justify-between text-xs text-red-200 animate-slideDown sticky top-[57px] z-30 backdrop-blur-md">
+        <div className="bg-[#fee2e2] border-b-4 border-black px-4 py-3 flex items-center justify-between text-xs text-black font-bold animate-slideDown sticky top-[57px] z-30 shadow-neo-sm">
           <div className="flex items-center gap-2.5 max-w-5xl mx-auto flex-1">
-            <ShieldAlert className="w-4 h-4 text-red-400 animate-pulse flex-shrink-0" />
+            <ShieldAlert className="w-5 h-5 text-[#dc2626] flex-shrink-0 stroke-[2.5]" />
             <span>
-              <strong>{securityAlerts[0].title || 'Security Intrusion Alert:'}</strong> Target account{' '}
-              <span className="font-mono text-cyan-300 font-bold">{securityAlerts[0].username}</span> suffered{' '}
-              <span className="text-red-300 font-bold">{securityAlerts[0].attemptCount} consecutive failed attempts</span>. Dispatched security email to real account owner!
+              <strong className="uppercase font-black text-[#b91c1c]">{securityAlerts[0].title || 'Security Intrusion Alert:'}</strong> Target account{' '}
+              <span className="font-mono bg-[#ffe600] px-1 border border-black rounded">{securityAlerts[0].username}</span> suffered{' '}
+              <strong className="text-[#dc2626] underline">{securityAlerts[0].attemptCount} consecutive failed attempts</strong>. Dispatched security email to real account owner!
             </span>
           </div>
           <button
             onClick={() => clearAlert(0)}
-            className="text-red-400 hover:text-white font-bold text-xs p-1"
+            className="w-6 h-6 rounded bg-white border border-black text-black font-black text-xs flex items-center justify-center hover:bg-[#fca5a5]"
           >
             ✕
           </button>

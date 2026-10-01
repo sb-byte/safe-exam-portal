@@ -16,18 +16,16 @@ export default function ProctoringMonitor({
 
   const [stream, setStream] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [headPose, setHeadPose] = useState('center'); // 'center' | 'left' | 'right'
+  const [headPose, setHeadPose] = useState('center');
   const [faceCount, setFaceCount] = useState(1);
-  const [warningModal, setWarningModal] = useState(null); // { title, message, type }
+  const [warningModal, setWarningModal] = useState(null);
   const [isSirenMuted, setIsSirenMuted] = useState(false);
 
-  // Looking away timer
   const lookAwayStartRef = useRef(null);
   const lookAwayLoggedRef = useRef(false);
   const noFaceStartRef = useRef(null);
   const noFaceLoggedRef = useRef(false);
 
-  // Helper: Log event to backend API
   const logViolation = useCallback(async (type, details, severity = 'WARNING', duration = null) => {
     try {
       await examApi.logEvent({
@@ -43,7 +41,6 @@ export default function ProctoringMonitor({
     }
   }, [studentId, studentName]);
 
-  // Start Proctoring Camera
   const startCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -58,7 +55,6 @@ export default function ProctoringMonitor({
         videoRef.current.srcObject = mediaStream;
       }
     } catch (err) {
-      console.error('Proctoring camera access denied:', err);
       setCameraActive(false);
       setIsCameraCompulsoryBlocked(true);
       if (onCameraStatusChange) onCameraStatusChange(false);
@@ -66,7 +62,6 @@ export default function ProctoringMonitor({
     }
   }, [logViolation, onCameraStatusChange, setIsCameraCompulsoryBlocked]);
 
-  // Stop camera helper (for demo toggle or unmount)
   const stopCamera = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
@@ -92,7 +87,6 @@ export default function ProctoringMonitor({
     };
   }, []);
 
-  // Frame processing loop for Head Direction and Multiple Faces
   useEffect(() => {
     if (!stream || !cameraActive) return;
 
@@ -123,7 +117,6 @@ export default function ProctoringMonitor({
       let leftLuma = 0;
       let rightLuma = 0;
 
-      // Sample central grid
       const cx = w / 2;
       const cy = h / 2;
       for (let y = 30; y < h - 30; y += 4) {
@@ -153,8 +146,7 @@ export default function ProctoringMonitor({
 
       const now = Date.now();
 
-      // RULE: Looking left or right for long (> 3 seconds)
-      // -> Warning popup and siren sound!
+      // Looking left or right for long (> 3 seconds)
       if (currentPose !== 'center' && hasFace) {
         if (!lookAwayStartRef.current) {
           lookAwayStartRef.current = now;
@@ -162,12 +154,11 @@ export default function ProctoringMonitor({
           lookAwayLoggedRef.current = true;
           const durationSec = Math.round((now - lookAwayStartRef.current) / 1000);
 
-          // Play Siren via Web Audio API!
           siren.playSiren(3000);
 
           setWarningModal({
-            title: '⚠️ Suspicious Gaze / Looking Away Detected!',
-            message: `You have been looking ${currentPose.toUpperCase()} for more than 3 seconds. Keep your focus on the exam screen.`,
+            title: '⚠️ Gaze Deviation / Looking Away Detected!',
+            message: `You have been looking ${currentPose.toUpperCase()} for more than 3 seconds. Focus on the screen.`,
             type: 'LOOKING_AWAY'
           });
 
@@ -178,7 +169,7 @@ export default function ProctoringMonitor({
         lookAwayLoggedRef.current = false;
       }
 
-      // RULE: No face on camera
+      // No face on camera
       if (!hasFace) {
         if (!noFaceStartRef.current) {
           noFaceStartRef.current = now;
@@ -204,13 +195,11 @@ export default function ProctoringMonitor({
     };
   }, [stream, cameraActive, logViolation]);
 
-  // Audio mute toggle
   const toggleMute = () => {
     const muted = siren.toggleMute();
     setIsSirenMuted(muted);
   };
 
-  // Manual Trigger for Examiners (Simulate 4s looking away + siren)
   const triggerManualGazeViolation = () => {
     siren.playSiren(3000);
     setWarningModal({
@@ -221,7 +210,6 @@ export default function ProctoringMonitor({
     logViolation('LOOKING_AWAY', 'Looking away from screen for 4s (Demo Siren Trigger)', 'WARNING', 4);
   };
 
-  // Manual Trigger for Multiple Faces
   const triggerMultipleFacesViolation = () => {
     setFaceCount(2);
     setWarningModal({
@@ -235,63 +223,61 @@ export default function ProctoringMonitor({
 
   return (
     <>
-      {/* Floating Picture-in-Picture Proctoring HUD */}
-      <div className="fixed top-20 right-6 z-40 w-52 sm:w-64 cyber-card rounded-2xl p-2.5 shadow-2xl border border-cyan-500/40 bg-slate-950/90 backdrop-blur-md">
-        <div className="flex items-center justify-between mb-2 px-1">
+      {/* Floating Picture-in-Picture Proctoring Widget */}
+      <div className="fixed top-20 right-6 z-40 w-56 sm:w-64 bg-white rounded-2xl p-3 border-3 border-black shadow-neo-lg text-black">
+        <div className="flex items-center justify-between mb-2 pb-1.5 border-b-2 border-black">
           <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'}`} />
-            <span className="text-[11px] font-mono font-bold tracking-wider text-slate-200">
+            <span className={`w-2.5 h-2.5 rounded-full border border-black ${cameraActive ? 'bg-[#10b981]' : 'bg-[#ef4444]'}`} />
+            <span className="text-[11px] font-mono font-black tracking-wider uppercase">
               AI PROCTOR LIVE
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={toggleMute}
-              title={isSirenMuted ? 'Unmute Warning Siren' : 'Mute Warning Siren'}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              {isSirenMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
-            </button>
-          </div>
+          <button
+            onClick={toggleMute}
+            title={isSirenMuted ? 'Unmute Siren' : 'Mute Siren'}
+            className="p-1 rounded bg-[#f8f5ee] border border-black shadow-[1px_1px_0px_#000] text-black hover:bg-[#ffe600] transition-colors"
+          >
+            {isSirenMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+          </button>
         </div>
 
         {/* Video Canvas Container */}
-        <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-900 border border-slate-800">
+        <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black border-2 border-black shadow-neo-sm">
           <video ref={videoRef} autoPlay playsInline muted className="hidden" />
           <canvas ref={canvasRef} className="w-full h-full object-cover transform -scale-x-100" />
 
           {/* Orientation Badge Overlay */}
-          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between text-[10px] font-mono px-2 py-1 rounded-md bg-slate-950/80 backdrop-blur-md border border-slate-700/50">
-            <span className={headPose === 'center' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between text-[10px] font-mono font-black px-2 py-1 rounded bg-white border border-black shadow-[1px_1px_0px_#000]">
+            <span className={headPose === 'center' ? 'text-[#059669]' : 'text-[#d97706]'}>
               HEAD: {headPose.toUpperCase()}
             </span>
-            <span className="text-cyan-300">
+            <span className="text-black">
               FACES: {faceCount}
             </span>
           </div>
         </div>
 
-        {/* Quick Demo Controls for Examiner / Viva Presentation */}
-        <div className="mt-2 pt-2 border-t border-slate-800/80 flex flex-col gap-1 text-[11px]">
-          <div className="flex items-center justify-between gap-1">
+        {/* Quick Demo Controls for Examiner */}
+        <div className="mt-2.5 pt-2 border-t-2 border-black flex flex-col gap-1.5 text-[11px]">
+          <div className="flex items-center justify-between gap-1.5">
             <button
               type="button"
               onClick={cameraActive ? stopCamera : startCamera}
-              className={`flex-1 py-1 px-1.5 rounded text-[10px] font-medium transition-colors flex items-center justify-center gap-1 ${
-                cameraActive ? 'bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-300'
+              className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-black border-2 border-black shadow-neo-sm flex items-center justify-center gap-1 transition-all ${
+                cameraActive ? 'bg-[#fca5a5] hover:bg-[#ef4444] text-black' : 'bg-[#86efac] text-black'
               }`}
             >
-              {cameraActive ? <CameraOff className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
-              <span>{cameraActive ? 'Turn Cam Off (Demo)' : 'Turn Cam On'}</span>
+              {cameraActive ? <CameraOff className="w-3 h-3 stroke-[2.5]" /> : <Camera className="w-3 h-3 stroke-[2.5]" />}
+              <span>{cameraActive ? 'Cam Off (Demo)' : 'Turn Cam On'}</span>
             </button>
 
             <button
               type="button"
               onClick={triggerManualGazeViolation}
-              className="flex-1 py-1 px-1.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 flex items-center justify-center gap-1"
+              className="flex-1 py-1 px-1.5 rounded-lg text-[10px] font-black bg-[#fde047] hover:bg-[#facc15] text-black border-2 border-black shadow-neo-sm flex items-center justify-center gap-1 transition-all"
             >
-              <EyeOff className="w-3 h-3" />
+              <EyeOff className="w-3 h-3 stroke-[2.5]" />
               <span>Siren Demo</span>
             </button>
           </div>
@@ -299,60 +285,61 @@ export default function ProctoringMonitor({
           <button
             type="button"
             onClick={triggerMultipleFacesViolation}
-            className="w-full py-1 rounded text-[10px] font-medium bg-purple-500/15 text-purple-300 hover:bg-purple-500/25 border border-purple-500/30 flex items-center justify-center gap-1"
+            className="w-full py-1 rounded-lg text-[10px] font-black bg-[#e9d5ff] hover:bg-[#d8b4fe] text-black border-2 border-black shadow-neo-sm flex items-center justify-center gap-1 transition-all"
           >
-            <Users className="w-3 h-3" />
+            <Users className="w-3 h-3 stroke-[2.5]" />
             <span>Simulate Multiple Faces Flag</span>
           </button>
         </div>
       </div>
 
-      {/* COMPULSORY CAMERA BLOCKING POPUP REQUIREMENT:
-          "Camera is compulsory. If it is off, a popup appears in the middle of the page.
-           The student cannot answer or submit until the camera is on." */}
+      {/* COMPULSORY CAMERA BLOCKING POPUP */}
       {isCameraCompulsoryBlocked && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-fadeIn">
-          <div className="relative w-full max-w-md cyber-card rounded-2xl p-6 sm:p-8 text-center border-2 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)]">
-            <div className="w-20 h-20 mx-auto rounded-full bg-red-500/15 border-2 border-red-500 flex items-center justify-center text-red-500 mb-4 animate-bounce">
-              <CameraOff className="w-10 h-10" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-8 text-center border-4 border-black shadow-neo-xl">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-[#fee2e2] border-3 border-black shadow-neo flex items-center justify-center text-[#dc2626] mb-5 animate-bounce">
+              <CameraOff className="w-10 h-10 stroke-[2.5]" />
             </div>
 
-            <h3 className="text-xl font-bold text-white font-display mb-2">
-              PROCTORING CAMERA IS COMPULSORY!
+            <span className="neo-badge bg-[#ef4444] text-white text-xs px-3 py-1 mb-2 inline-block">
+              CRITICAL PROCTORING VIOLATION
+            </span>
+
+            <h3 className="text-2xl font-black text-black font-display uppercase tracking-tight mb-2">
+              CAMERA IS COMPULSORY!
             </h3>
 
-            <p className="text-sm text-slate-300 mb-6 leading-relaxed">
-              Your camera is currently turned off or blocked. Under strict examination regulations,
-              <strong className="text-red-400"> you cannot answer questions or submit the test </strong>
-              until continuous live video proctoring is restored.
+            <p className="text-sm font-semibold text-slate-800 mb-6 leading-relaxed">
+              Your camera is turned off or blocked. Under strict examination rules,
+              <strong className="text-[#b91c1c] underline"> you cannot answer questions or submit the test </strong>
+              until continuous live video proctoring is enabled.
             </p>
 
             <button
               type="button"
               onClick={startCamera}
-              className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#86efac] hover:bg-[#4ade80] text-black font-black rounded-xl text-base neo-btn-lg flex items-center justify-center gap-2 uppercase tracking-wide"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-5 h-5 stroke-[3]" />
               <span>Enable Camera to Continue Exam</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* WARNING POPUP & SIREN MODAL REQUIREMENT:
-          "Looking left or right for long -> Warning popup and siren sound" */}
+      {/* WARNING POPUP & SIREN MODAL */}
       {warningModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-sm cyber-card rounded-2xl p-6 text-center border border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.25)]">
-            <div className="w-14 h-14 mx-auto rounded-full bg-amber-500/20 border border-amber-500 flex items-center justify-center text-amber-400 mb-3 animate-pulse">
-              <AlertTriangle className="w-8 h-8" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-sm bg-[#fef3c7] rounded-2xl p-6 text-center border-4 border-black shadow-neo-xl">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-white border-3 border-black shadow-neo flex items-center justify-center text-[#d97706] mb-3">
+              <AlertTriangle className="w-9 h-9 stroke-[3]" />
             </div>
 
-            <h4 className="text-base font-bold text-amber-300 font-display mb-2">
+            <h4 className="text-lg font-black text-black font-display uppercase tracking-tight mb-2">
               {warningModal.title}
             </h4>
 
-            <p className="text-xs text-slate-300 mb-5 leading-relaxed">
+            <p className="text-xs font-bold text-slate-800 mb-5 leading-snug">
               {warningModal.message}
             </p>
 
@@ -362,7 +349,7 @@ export default function ProctoringMonitor({
                 setWarningModal(null);
                 siren.stop();
               }}
-              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors"
+              className="w-full py-3 bg-[#ffe600] hover:bg-[#fde047] text-black font-black rounded-xl text-xs neo-btn uppercase tracking-wide"
             >
               I Understand — Return to Exam
             </button>
