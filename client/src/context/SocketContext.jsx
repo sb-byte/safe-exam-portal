@@ -11,8 +11,8 @@ export function SocketProvider({ children }) {
   const [latestScoreUpdate, setLatestScoreUpdate] = useState(null);
 
   useEffect(() => {
-    // In dev, proxy handles or direct connect to port 5001
-    const socketInstance = io(window.location.origin, {
+    const socketBase = import.meta.env.VITE_API_URL || window.location.origin;
+    const socketInstance = io(socketBase, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
