@@ -24,7 +24,7 @@ function Root() {
     }
   };
 
-  const effectiveClientId = clientId || '1088265005952-demo.apps.googleusercontent.com';
+  const effectiveClientId = clientId || '53832700314-3suhnkitlj5ksh0a4smjmb15dqt6ilq7.apps.googleusercontent.com';
 
   return (
     <GoogleConfigContext.Provider value={{ clientId, setClientId: updateClientId }}>
