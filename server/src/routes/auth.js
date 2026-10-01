@@ -7,6 +7,9 @@ import { getGeoLocation, parseDeviceInfo } from '../services/geo.js';
 import { sendSecurityAlertEmail } from '../services/mailer.js';
 import { broadcastSecurityAlert, broadcastUserUpdate } from '../services/socket.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { OAuth2Client } from 'google-auth-library';
+
+const googleOAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'secure-exam-cyber-jwt-key-2026';
@@ -31,15 +34,51 @@ function calculateEuclideanDistance(vec1, vec2) {
   return Math.sqrt(sum);
 }
 
-// Helper: Decode Google JWT Token (JWT format: header.payload.signature)
-function decodeGoogleJwt(credential) {
+// Cryptographic verification of genuine Google ID tokens
+async function verifyGoogleTokenCryptographically(credential) {
+  if (!credential) {
+    throw new Error('Google credential token is missing.');
+  }
+
+  // Method 1: Verify directly against Google's public OAuth2 tokeninfo service
   try {
-    const parts = credential.split('.');
-    if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], 'base64url').toString('utf-8');
-    return JSON.parse(payload);
-  } catch (e) {
-    return null;
+    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+    if (res.ok) {
+      const payload = await res.json();
+      if (payload.email && (payload.email_verified === 'true' || payload.email_verified === true)) {
+        return {
+          email: payload.email,
+          name: payload.name || payload.email.split('@')[0],
+          picture: payload.picture,
+          googleId: payload.sub,
+          emailVerified: true
+        };
+      }
+    }
+  } catch (netErr) {
+    console.warn('Network call to Google tokeninfo failed, trying offline validation:', netErr);
+  }
+
+  // Method 2: Offline cryptographic verification using google-auth-library certificates
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID || undefined
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      throw new Error('Invalid Google payload');
+    }
+    return {
+      email: payload.email,
+      name: payload.name || payload.email.split('@')[0],
+      picture: payload.picture,
+      googleId: payload.sub,
+      emailVerified: payload.email_verified
+    };
+  } catch (err) {
+    console.error('Cryptographic Google verification failed:', err);
+    throw new Error('Invalid or unverified Google credentials. Authentication failed.');
   }
 }
 
@@ -204,36 +243,21 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
-// 3. Google OAuth & SSO Authentication
+// 3. Actual Google OAuth & SSO Authentication
 router.post('/google', authLimiter, async (req, res) => {
   try {
-    const { credential, googleProfile, requestedRole } = req.body;
+    const { credential, requestedRole } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'Enterprise Web Browser';
 
-    let email = null;
-    let name = null;
-    let picture = null;
-    let googleId = null;
-
-    if (credential) {
-      const decoded = decodeGoogleJwt(credential);
-      if (decoded) {
-        email = decoded.email;
-        name = decoded.name;
-        picture = decoded.picture;
-        googleId = decoded.sub;
-      }
-    } else if (googleProfile) {
-      email = googleProfile.email;
-      name = googleProfile.name || googleProfile.fullName;
-      picture = googleProfile.picture || googleProfile.avatarUrl;
-      googleId = googleProfile.googleId || googleProfile.sub || `goog_${Date.now()}`;
+    if (!credential) {
+      return res.status(400).json({ error: 'Genuine Google OAuth credential token is required.' });
     }
 
-    if (!email) {
-      return res.status(400).json({ error: 'Valid Google authentication token or profile required.' });
-    }
+    // Cryptographically verify Google token
+    const verifiedGoogleUser = await verifyGoogleTokenCryptographically(credential);
+
+    const { email, name, picture, googleId } = verifiedGoogleUser;
 
     const location = await getGeoLocation(ip);
     const device = parseDeviceInfo(userAgent);
